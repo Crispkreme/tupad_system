@@ -17,15 +17,24 @@ export default defineConfig({
                 }),
             ],
         }),
+
         inertia(),
+
         react({
             babel: {
                 plugins: ['babel-plugin-react-compiler'],
             },
         }),
+
         tailwindcss(),
-        wayfinder({
-            formVariants: true,
-        }),
+
+        // Run Wayfinder locally, but not during Vercel's Node build
+        ...(!process.env.VERCEL
+            ? [
+                  wayfinder({
+                      formVariants: true,
+                  }),
+              ]
+            : []),
     ],
 });
