@@ -611,19 +611,22 @@ export default function Households() {
         household: Household,
         member: HouseholdMember
     ): void {
+        setShowDetailsModal(false);
+        setShowMemberModal(true);
+
         setSelectedHousehold(household);
         setEditingMember(member);
 
         setMemberForm({
             name: member.name || '',
-            birth_date: member.birth_date || '',
+            birth_date: member.birth_date
+                ? member.birth_date.substring(0, 10)
+                : '',
             age: String(member.age ?? ''),
             sex: member.sex || '',
-            civil_status:
-                member.civil_status || 'Single',
+            civil_status: member.civil_status || 'single',
         });
 
-        setShowMemberModal(true);
         setError('');
     }
 
@@ -1610,7 +1613,13 @@ export default function Households() {
                                                             </td>
 
                                                             <td className="px-4 py-3 text-sm text-gray-700">
-                                                                {member.birth_date}
+                                                                {member.birth_date
+                                                                ? new Date(member.birth_date).toLocaleDateString('en-US', {
+                                                                    year: 'numeric',
+                                                                    month: 'long',
+                                                                    day: 'numeric',
+                                                                })
+                                                                : '—'}
                                                             </td>
 
                                                             <td className="px-4 py-3 text-sm text-gray-700">
@@ -1618,11 +1627,17 @@ export default function Households() {
                                                             </td>
 
                                                             <td className="px-4 py-3 text-sm text-gray-700">
-                                                                {member.sex}
+                                                                {member.sex
+                                                                ? member.sex.charAt(0).toUpperCase() +
+                                                                member.sex.slice(1)
+                                                                : '—'}
                                                             </td>
 
                                                             <td className="px-4 py-3 text-sm text-gray-700">
-                                                                {member.civil_status}
+                                                                {member.civil_status
+                                                                ? member.civil_status.charAt(0).toUpperCase() +
+                                                                member.civil_status.slice(1)
+                                                                : '—'}
                                                             </td>
 
                                                             <td className="px-4 py-3">
