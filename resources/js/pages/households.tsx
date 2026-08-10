@@ -493,11 +493,9 @@ export default function Households() {
                 `/api/households/${household.id}/members/${member.id}`,
                 {
                     method: 'DELETE',
-
                     headers: {
                         Accept: 'application/json',
                     },
-
                     credentials: 'include',
                 }
             );
@@ -517,18 +515,44 @@ export default function Households() {
                 );
             }
 
-            setSuccess(
-                'Member deleted successfully.'
+            /*
+            * Immediately remove the deleted member
+            * from the currently opened household modal.
+            */
+            setSelectedHousehold((currentHousehold) => {
+                if (!currentHousehold) {
+                    return currentHousehold;
+                }
+
+                return {
+                    ...currentHousehold,
+                    members: (currentHousehold.members ?? []).filter(
+                        (currentMember) =>
+                            currentMember.id !== member.id
+                    ),
+                };
+            });
+
+            /*
+            * Also update the household list in the background.
+            */
+            setHouseholds((currentHouseholds) =>
+                currentHouseholds.map((currentHousehold) => {
+                    if (currentHousehold.id !== household.id) {
+                        return currentHousehold;
+                    }
+
+                    return {
+                        ...currentHousehold,
+                        members: (currentHousehold.members ?? []).filter(
+                            (currentMember) =>
+                                currentMember.id !== member.id
+                        ),
+                    };
+                })
             );
 
-            const updatedHousehold =
-                await getSingleHousehold(household.id);
-
-            if (updatedHousehold) {
-                setSelectedHousehold(updatedHousehold);
-            }
-
-            await getHouseholds();
+            setSuccess('Member deleted successfully.');
 
         } catch (error) {
             console.error(error);
