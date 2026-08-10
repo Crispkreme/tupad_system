@@ -107,6 +107,9 @@ export default function Households() {
     const [memberForm, setMemberForm] =
         useState<MemberForm>(emptyMemberForm);
 
+    useEffect(() => {
+        getHouseholds();
+    }, []);
     /*
     |--------------------------------------------------------------------------
     | Load households
