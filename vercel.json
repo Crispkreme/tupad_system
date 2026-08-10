@@ -1,14 +1,14 @@
 {
-  "outputDirectory": "public",
-  "functions": {
-    "api/lambda.php": {
-      "runtime": "vercel-php@0.7.3"
-    }
-  },
-  "rewrites": [
-    {
-      "source": "/(.*)",
-      "destination": "/api/lambda.php"
-    }
-  ]
+    "version": 2,
+    "functions": {
+        "api/lambda.php": {
+            "runtime": "vercel-php@0.7.3"
+        }
+    },
+    "rewrites": [
+        {
+            "source": "/(.*)",
+            "destination": "/api/lambda.php"
+        }
+    ]
 }
