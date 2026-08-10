@@ -588,13 +588,22 @@ export default function Households() {
         setHouseholdForm(emptyHouseholdForm);
     }
 
-    function openCreateMember(
-        household: Household
-    ): void {
+    // function openCreateMember(
+    //     household: Household
+    // ): void {
+    //     setSelectedHousehold(household);
+    //     setEditingMember(null);
+    //     setMemberForm(emptyMemberForm);
+    //     setShowMemberModal(true);
+    //     setError('');
+    // }
+    function openCreateMember(household: Household): void {
+        setShowDetailsModal(false); // Close Household Details
+        setShowMemberModal(true);   // Open Add Member
+
         setSelectedHousehold(household);
         setEditingMember(null);
         setMemberForm(emptyMemberForm);
-        setShowMemberModal(true);
         setError('');
     }
 
@@ -1313,11 +1322,11 @@ export default function Households() {
                                         Select sex
                                     </option>
 
-                                    <option value="Male">
+                                    <option value="male">
                                         Male
                                     </option>
 
-                                    <option value="Female">
+                                    <option value="female">
                                         Female
                                     </option>
 
@@ -1344,23 +1353,23 @@ export default function Households() {
                                     }
                                     className="w-full rounded-lg border border-gray-300 px-4 py-3 bg-white"
                                 >
-                                    <option value="Single">
+                                    <option value="single">
                                         Single
                                     </option>
 
-                                    <option value="Married">
+                                    <option value="married">
                                         Married
                                     </option>
 
-                                    <option value="Widowed">
+                                    <option value="widowed">
                                         Widowed
-                                    </option>
+                                    </option>   
 
-                                    <option value="Separated">
+                                    <option value="separated">
                                         Separated
                                     </option>
 
-                                    <option value="Divorced">
+                                    <option value="divorced">
                                         Divorced
                                     </option>
 
