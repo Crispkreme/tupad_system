@@ -48,7 +48,7 @@
     "isEntry": true
   },
   "resources/js/app.tsx": {
-    "file": "assets/app-ChKI15OI.js",
+    "file": "assets/app-BHRjZA84.js",
     "name": "app",
     "src": "resources/js/app.tsx",
     "isEntry": true,
@@ -63,7 +63,7 @@
     ]
   },
   "resources/js/pages/dashboard.tsx": {
-    "file": "assets/dashboard-IaVeCdQ6.js",
+    "file": "assets/dashboard-B2XQHcyQ.js",
     "name": "dashboard",
     "src": "resources/js/pages/dashboard.tsx",
     "isDynamicEntry": true,
@@ -74,7 +74,7 @@
     ]
   },
   "resources/js/pages/households.tsx": {
-    "file": "assets/households-BglirboH.js",
+    "file": "assets/households-wHYFL9vH.js",
     "name": "households",
     "src": "resources/js/pages/households.tsx",
     "isDynamicEntry": true,
@@ -85,7 +85,7 @@
     ]
   },
   "resources/js/pages/login.tsx": {
-    "file": "assets/login-_r7qmyjs.js",
+    "file": "assets/login-BFykEHT9.js",
     "name": "login",
     "src": "resources/js/pages/login.tsx",
     "isDynamicEntry": true,
@@ -96,7 +96,7 @@
     ]
   },
   "resources/js/pages/welcome.tsx": {
-    "file": "assets/welcome-Tl7tmC89.js",
+    "file": "assets/welcome-D-R2VkVs.js",
     "name": "welcome",
     "src": "resources/js/pages/welcome.tsx",
     "isDynamicEntry": true,
