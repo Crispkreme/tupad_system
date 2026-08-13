@@ -64,6 +64,8 @@ final class Tia implements AddsOutput, HandlesArguments, HandlesOriginalArgument
 
     private const string BASELINE_PATH_OPTION = '--baseline';
 
+    private const string MUTATE_OPTION = '--mutate';
+
     private const string ENV_MUTATION_TESTING = 'PEST_MUTATION_TESTING';
 
     private const string ENV_TIA = 'PEST_TIA';
@@ -105,8 +107,6 @@ final class Tia implements AddsOutput, HandlesArguments, HandlesOriginalArgument
     private const string DEFAULT_BRANCH = 'main';
 
     /**
-     * PHPUnit/Pest CLI flags whose subsequent argument is a value, not a path.
-     *
      * @var list<string>
      */
     private const array VALUE_TAKING_FLAGS = [
@@ -331,6 +331,18 @@ final class Tia implements AddsOutput, HandlesArguments, HandlesOriginalArgument
         return ! self::argumentPresent('--ci', $arguments);
     }
 
+    /**
+     * @param  array<int, string>  $arguments
+     */
+    public static function isMutationRun(array $arguments): bool
+    {
+        if (self::argumentPresent(self::MUTATE_OPTION, $arguments)) {
+            return true;
+        }
+
+        return getenv(self::ENV_MUTATION_TESTING) !== false;
+    }
+
     public static function recordsEdgesInWorkers(): bool
     {
         return (string) Parallel::getGlobal(self::RECORDING_GLOBAL) === '1'
@@ -354,7 +366,6 @@ final class Tia implements AddsOutput, HandlesArguments, HandlesOriginalArgument
 
     /**
      * Mirrors {@see HandleArguments::hasArgument()} for
-     * use from static contexts — matches both `--flag` and `--flag=value`.
      *
      * @param  array<int, string>  $arguments
      */
@@ -475,6 +486,8 @@ final class Tia implements AddsOutput, HandlesArguments, HandlesOriginalArgument
         $partial = ! $isWorker && ($hasExplicitPath || $this->hasPartialSelection($arguments));
         $disabled = $disabled || $partial;
 
+        $mutating = self::isMutationRun($this->originalArguments);
+
         if (getenv(self::ENV_MUTATION_TESTING) !== false) {
             $this->writesSuppressed = true;
         }
@@ -504,6 +517,16 @@ final class Tia implements AddsOutput, HandlesArguments, HandlesOriginalArgument
                     $this->renderChild('TIA does not apply to partial runs — running the selected tests directly.');
                 }
             }
+
+            $this->forceRefetch = false;
+            $this->filteredMode = false;
+
+            return $arguments;
+        }
+
+        if (! $isWorker && $mutating && ($enabled || $this->forceRefetch)) {
+            $this->requestWorkerResults();
+            $this->emitMutationScopedRecordSkipped();
 
             $this->forceRefetch = false;
             $this->filteredMode = false;
@@ -1289,6 +1312,14 @@ final class Tia implements AddsOutput, HandlesArguments, HandlesOriginalArgument
         $this->renderChild('Record the baseline with a plain --tia run first; coverage runs then reuse it.');
     }
 
+    private function emitMutationScopedRecordSkipped(): void
+    {
+        $this->output->writeln('');
+
+        $this->renderChild('Running in TIA mode, however TIA is skipped as mutation testing needs the coverage of a complete run.');
+        $this->renderChild('Drop --mutate to narrow and replay with TIA.');
+    }
+
     /**
      * @param  array<string, array<int, string>>  $perTestFiles
      * @param  array<string, array<int, string>>  $perTestTables
@@ -1626,10 +1657,6 @@ final class Tia implements AddsOutput, HandlesArguments, HandlesOriginalArgument
     }
 
     /**
-     * Union of two per-test edge maps — piggybacked line-coverage edges plus
-     * the recorder's link-tracked edges (rendered Blade views, ...), which
-     * never appear in line coverage.
-     *
      * @param  array<string, array<int, string>>  $coverage
      * @param  array<string, array<int, string>>  $linked
      * @return array<string, array<int, string>>
@@ -2127,13 +2154,6 @@ final class Tia implements AddsOutput, HandlesArguments, HandlesOriginalArgument
         return implode(', ', array_keys($seen));
     }
 
-    /**
-     * The path from the git repository root down to $projectRoot (e.g.
-     * `laravel-app`) when the project is nested inside a larger repo, or `null`
-     * when the project root is itself the repo root (or git is unavailable).
-     * TIA requires the two to coincide: git reports and addresses paths
-     * relative to the repo root, while the dependency graph is project-relative.
-     */
     private function gitSubdirectoryPrefix(string $projectRoot): ?string
     {
         return new Git($projectRoot)->subdirectoryPrefix();

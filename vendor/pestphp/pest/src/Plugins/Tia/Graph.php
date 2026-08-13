@@ -18,6 +18,15 @@ use PHPUnit\TextUI\Configuration\Registry;
  */
 final class Graph
 {
+    /**
+     * @var array<string, string>
+     */
+    private const array LIVEWIRE_GENERATED_PATHS = [
+        '/livewire/views/' => '.blade.php',
+        '/livewire/placeholders/' => '.blade.php',
+        '/livewire/classes/' => '.php',
+    ];
+
     /** @var array<int, string> */
     private array $files = [];
 
@@ -103,14 +112,15 @@ final class Graph
 
         $this->applyTestFileChanges($nonMigrationPaths, $affectedSet);
 
-        $staticallyHandledBlade = $this->applyBladeStaticChanges($nonMigrationPaths, $affectedSet);
+        $handledBlade = $this->applyBladeStaticChanges($nonMigrationPaths, $affectedSet)
+            + $this->applyLivewireComponentChanges($nonMigrationPaths, $affectedSet);
 
         $this->applyWatchPatternFallback(
             $nonMigrationPaths,
             $unparseableMigrations,
             $preciselyHandledPages,
             $sharedFilesResolved,
-            $staticallyHandledBlade,
+            $handledBlade,
             $affectedSet,
         );
 
@@ -170,9 +180,6 @@ final class Graph
      */
     private function applyMigrationChanges(array $migrationPaths, array &$affectedSet): array
     {
-        // With no recorded table usage at all, table intersection can never
-        // select anything — route every migration change through the
-        // watch-pattern fallback instead of silently skipping tests.
         if ($this->testTables === []) {
             return $migrationPaths;
         }
@@ -217,7 +224,6 @@ final class Graph
      * @param  list<string>  $nonMigrationPaths
      * @param  array<string, true>  $affectedSet
      * @return array{0: array<string, true>, 1: array<string, true>, 2: array<string, true>}
-     *                                                                                       globalFrontendRuntimeFiles, preciselyHandledPages, sharedFilesResolved
      */
     private function applyInertiaChanges(array $nonMigrationPaths, array &$affectedSet): array
     {
@@ -426,9 +432,6 @@ final class Graph
     }
 
     /**
-     * A changed file inside the configured test suites is itself the unit of
-     * work — always run it (new untracked tests, edited tests, renames).
-     *
      * @param  list<string>  $nonMigrationPaths
      * @param  array<string, true>  $affectedSet
      */
@@ -474,9 +477,6 @@ final class Graph
 
             $bladeAffected = $this->affectedByStaticBladeUsage($rel);
 
-            // Only a walk that actually selected tests counts as handled — a
-            // component whose usage the static walk missed must still reach
-            // the watch-pattern fallback instead of being silently swallowed.
             if ($bladeAffected !== []) {
                 foreach ($bladeAffected as $testFile) {
                     $affectedSet[$testFile] = true;
@@ -491,10 +491,143 @@ final class Graph
 
     /**
      * @param  list<string>  $nonMigrationPaths
+     * @param  array<string, true>  $affectedSet
+     * @return array<string, true>
+     */
+    private function applyLivewireComponentChanges(array $nonMigrationPaths, array &$affectedSet): array
+    {
+        $generatedIds = $this->livewireGeneratedFileIds();
+
+        if ($generatedIds === []) {
+            return [];
+        }
+
+        /** @var array<int, array<string, true>> $sourcesByGeneratedId */
+        $sourcesByGeneratedId = [];
+
+        foreach ($nonMigrationPaths as $rel) {
+            foreach ($this->livewireSourcePaths($rel) as $sourcePath) {
+                foreach ($generatedIds[$this->livewireHash($sourcePath)] ?? [] as $id) {
+                    $sourcesByGeneratedId[$id][$rel] = true;
+                }
+            }
+        }
+
+        if ($sourcesByGeneratedId === []) {
+            return [];
+        }
+
+        $handled = [];
+
+        foreach ($this->edges as $testFile => $ids) {
+            foreach ($ids as $id) {
+                if (! isset($sourcesByGeneratedId[$id])) {
+                    continue;
+                }
+
+                $affectedSet[$testFile] = true;
+                $handled += $sourcesByGeneratedId[$id];
+            }
+        }
+
+        return $handled;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function livewireSourcePaths(string $rel): array
+    {
+        $sourcePaths = [];
+
+        if (str_ends_with($rel, '.blade.php')) {
+            $sourcePaths[] = $rel;
+        }
+
+        $componentDirectory = dirname($rel);
+
+        if ($this->isLivewireMultiFileDirectory($componentDirectory)) {
+            $sourcePaths[] = $componentDirectory;
+        }
+
+        return $sourcePaths;
+    }
+
+    private function isLivewireMultiFileDirectory(string $componentDirectory): bool
+    {
+        $directoryName = basename($componentDirectory);
+
+        if (str_contains($directoryName, 'index')) {
+            $directoryName = 'index';
+        }
+
+        $componentName = preg_replace('/⚡[\x{FE0E}\x{FE0F}]?/u', '', $directoryName);
+
+        if ($componentName === null || $componentName === '') {
+            return false;
+        }
+
+        $source = $this->projectRoot.'/'.$componentDirectory.'/'.$componentName;
+
+        return is_file($source.'.php') && is_file($source.'.blade.php');
+    }
+
+    private function livewireHash(string $sourcePath): string
+    {
+        return substr(md5(DIRECTORY_SEPARATOR.str_replace('/', DIRECTORY_SEPARATOR, $sourcePath)), 0, 8);
+    }
+
+    /**
+     * @return array<string, list<int>>
+     */
+    private function livewireGeneratedFileIds(): array
+    {
+        $generated = [];
+
+        foreach ($this->fileIds as $path => $id) {
+            $hash = $this->livewireGeneratedHash($path);
+
+            if ($hash === null) {
+                continue;
+            }
+
+            $generated[$hash][] = $id;
+        }
+
+        return $generated;
+    }
+
+    private function livewireGeneratedHash(string $path): ?string
+    {
+        $normalized = '/'.ltrim($path, '/');
+
+        foreach (self::LIVEWIRE_GENERATED_PATHS as $directory => $extension) {
+            if (! str_ends_with($normalized, $extension)) {
+                continue;
+            }
+
+            $position = strrpos($normalized, $directory);
+
+            if ($position === false) {
+                continue;
+            }
+
+            $hash = substr($normalized, $position + strlen($directory), -strlen($extension));
+
+            if (preg_match('/^[0-9a-f]{8}$/', $hash) === 1) {
+                return $hash;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  list<string>  $nonMigrationPaths
      * @param  list<string>  $unparseableMigrations
      * @param  array<string, true>  $preciselyHandledPages
      * @param  array<string, true>  $sharedFilesResolved
-     * @param  array<string, true>  $staticallyHandledBlade
+     * @param  array<string, true>  $handledBlade
      * @param  array<string, true>  $affectedSet
      */
     private function applyWatchPatternFallback(
@@ -502,7 +635,7 @@ final class Graph
         array $unparseableMigrations,
         array $preciselyHandledPages,
         array $sharedFilesResolved,
-        array $staticallyHandledBlade,
+        array $handledBlade,
         array &$affectedSet,
     ): void {
         $unknownToGraph = $unparseableMigrations;
@@ -514,7 +647,7 @@ final class Graph
             if (isset($sharedFilesResolved[$rel])) {
                 continue;
             }
-            if (isset($staticallyHandledBlade[$rel])) {
+            if (isset($handledBlade[$rel])) {
                 continue;
             }
             if (! isset($this->fileIds[$rel])) {
@@ -742,11 +875,6 @@ final class Graph
         return $this->shouldRerunStatus(TestStatus::from($status));
     }
 
-    /**
-     * Whether a cached result with this status must be re-executed rather
-     * than replayed, honouring the configured failOn* / displayDetailsOn*
-     * policies.
-     */
     public function shouldRerunStatus(TestStatus $testStatus): bool
     {
         if ($testStatus->isFailure() || $testStatus->isError()) {
@@ -925,19 +1053,8 @@ final class Graph
     }
 
     /**
-     * Mark test files that executed under a recorded coverage session as "known",
-     * seeding an empty edge set for any that produced zero project-source edges.
-     *
-     * Without this, a test that covers no application source (e.g. a pure unit
-     * test asserting on language primitives) never becomes an edge key, so
      * {@see self::knowsTest()} reports it as unknown and it re-runs on every TIA
-     * run. Recording it with an empty edge set lets it be replayed/skipped while
-     * unchanged; it is still re-run whenever its own file changes, via
      * {@see self::applyTestFileChanges()}.
-     *
-     * Must only be called from the recording path, where coverage was actually
-     * collected — otherwise a missing edge set could mean "coverage was off",
-     * not "genuinely covered nothing".
      *
      * @param  array<int, string>  $testFiles  Absolute or project-relative test file paths.
      */
@@ -1366,7 +1483,6 @@ final class Graph
 
         $names = [$name, str_replace('_', '-', $name)];
 
-        // Anonymous index components: components/card/index.blade.php resolves as <x-card>.
         if (str_ends_with($name, '.index') && $name !== '.index') {
             $base = substr($name, 0, -strlen('.index'));
 
@@ -1523,9 +1639,6 @@ final class Graph
     }
 
     /**
-     * Prune baseline result entries whose test files were just executed but whose
-     * test IDs are no longer present (e.g. the test method was removed or renamed).
-     *
      * @param  array<int, string>  $touchedFiles  Absolute or project-relative paths.
      * @param  array<int, string>  $keepTestIds  Test IDs that produced a result this run.
      */
